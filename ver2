@@ -1,0 +1,43 @@
+import streamlit as st
+import pandas as pd
+from sqlalchemy import create_engine
+
+st.set_page_config(page_title="Time spent in locations", page_icon=":guardsman:", layout="wide")
+
+def fetch_data():
+    # Connect to the database
+    st.write("Connecting to the database...")
+    engine = create_engine('mysql+pymysql://rootremote2:GW#$ETfdsfWSF@54.247.47.50/cars_data')
+
+    # Read in data
+    st.write("Reading data from the database...")
+    df = pd.read_sql("""
+        SELECT zone, time_start, time_end, time_end - time_start as time_spent
+        FROM data
+        WHERE time_start > DATE_SUB(NOW(), INTERVAL 1 WEEK);
+        """, engine)
+
+    st.write("Converting time_start to datetime...")
+    #Convert time_start to datetime
+    df['time_start'] = pd.to_datetime(df['time_start'], unit='s')
+
+    # filter out the rows which does not contain the delimiter ">"
+    df = df[df.zone.str.contains(">")]
+
+    st.write("Splitting the 'zone' column...")
+    # Splitting the 'zone' column into two columns, location1, location2
+    df['location1'] = df.zone.str.split(">").str.get(0)
+    df['location2'] = df.zone.str.split(">").str.get(1)
+
+    st.write("Calculating time spent in each location...")
+    # Calculate time spent in each location
+    location_time1 = df.groupby("location1")["time_spent"].sum()
+    location_time2 = df.groupby("location2")["time_spent"].sum()
+    return location_time1, location_time2
+
+if st.button("Fetch data"):
+    location_time1, location_time2 = fetch_data()
+    st.bar_chart(location_time1)
+    st.bar_chart(location_time2)
+else:
+    st.write("Press the button above to fetch data.")
